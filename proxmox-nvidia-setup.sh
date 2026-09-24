@@ -203,7 +203,7 @@ verify() {
     fi
 
     log "\n[device nodes]"
-    ls -la /dev/nvidia* 2>/dev/null | tee -a "$LOGFILE" || log "No /dev/nvidia* nodes present yet (reboot needed, or driver not loaded)."
+    find /dev/nvidia* -maxdepth 0 2>/dev/null | tee -a "$LOGFILE" || log "No /dev/nvidia* nodes present yet (reboot needed, or driver not loaded)."
 }
 
 host_driver_version() {
@@ -308,8 +308,8 @@ lxc_passthrough() {
 
     log "Detecting device major numbers..."
     local gpu_major uvm_major
-    gpu_major=$(ls -la /dev/nvidia0 | awk '{print $5}' | tr -d ',')
-    uvm_major=$(ls -la /dev/nvidia-uvm 2>/dev/null | awk '{print $5}' | tr -d ',' || echo "")
+    gpu_major=$(stat -c '%t' /dev/nvidia0 | tr -d ',')
+    uvm_major=$(stat -c '%t' /dev/nvidia-uvm 2>/dev/null | tr -d ',' || echo "")
 
     if [[ -z "$uvm_major" ]]; then
         log "WARNING: /dev/nvidia-uvm not found. The nvidia-uvm kernel module may not be loaded."
@@ -368,12 +368,12 @@ install_utils_in_lxc() {
     local major="${version%%.*}"
 
     log "Enabling non-free repos inside container ${ctid} (in case they aren't already)..."
-    pct exec "$ctid" -- bash -c '
+    pct exec "$ctid" -- bash -c "
         f=/etc/apt/sources.list.d/debian.sources
-        if [ -f "$f" ] && grep -q "non-free-firmware" "$f" && ! grep -q "non-free " "$f"; then
-            sed -i "s/non-free-firmware/non-free non-free-firmware/" "$f"
+        if [ -f \"\$f\" ] && grep -q \"non-free-firmware\" \"\$f\" && ! grep -q \"non-free \" \"\$f\"; then
+            sed -i \"s/non-free-firmware/non-free non-free-firmware/\" \"\$f\"
         fi
-    ' || log "Could not auto-patch sources inside container — continuing anyway."
+    " || log "Could not auto-patch sources inside container — continuing anyway."
 
     log "Installing nvidia-utils-${major} inside container ${ctid}..."
     pct exec "$ctid" -- apt update || true
